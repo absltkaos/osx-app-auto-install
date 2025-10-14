@@ -88,6 +88,7 @@ type=app_name::install_method::install_data::app_path
 **Install Methods:**
 - `command` - Execute a shell command
 - `dmg` - Download and install from DMG file
+- `zip` - Download and install from ZIP file (handles both direct .app bundles and ZIP-wrapped DMG files)
 - `dmg_github_release` - Download latest DMG from GitHub releases (auto-detects architecture)
 - `dmg_web_release` - Download DMG from web release page (auto-detects architecture)
 - `dmg_synergy_release` - Download DMG from Synergy's release webpage and extract json from javascript to build the correct download URL
@@ -99,6 +100,7 @@ type=app_name::install_method::install_data::app_path
 ### Custom Installers
 ```
 custom=steam::dmg::https://cdn.akamai.steamstatic.com/client/installer/steam.dmg::/Applications/Steam.app
+custom=vscode::zip::https://code.visualstudio.com/sha/download?build=stable&os=darwin-universal::/Applications/Visual Studio Code.app
 custom=devlab::command::curl -sSL https://gitlab.com/evernym/utilities/devlab/install.sh | bash::/usr/local/bin/devlab
 custom=github_app::dmg_github_release::https://github.com/owner/repo::/Applications/GitHub App.app
 custom=web_app::dmg_web_release::https://example.com/downloads::/Applications/Web App.app

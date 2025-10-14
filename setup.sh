@@ -173,6 +173,12 @@ check_apps_config() {
                                 SUDO_REQUIRED=true
                             fi
                             ;;
+                        "zip")
+                            if ! is_app_installed "$app_name" "$app_path"; then
+                                log_info "Will install '$app_name' from ZIP"
+                                SUDO_REQUIRED=true
+                            fi
+                            ;;
                         "dmg_github_release")
                             if ! is_app_installed "$app_name" "$app_path"; then
                                 log_info "Will install '$app_name' from GitHub release"
@@ -328,6 +334,102 @@ install_brew_app() {
     log_info "Installing '$app_name' via Homebrew..."
     eval "$install_command"
     log_success "Successfully installed '$app_name' via Homebrew"
+}
+
+# Download and install app from ZIP
+install_zip_app() {
+    local app_name="$1"
+    local download_url="$2"
+    local app_path="$3"
+    local installer_name="$4"
+    
+    if is_app_installed "$app_name" "$app_path"; then
+        return 0
+    fi
+    
+    log_info "Installing '$app_name' from ZIP..."
+    
+    # Create temporary directory for downloads
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    local zip_path="$temp_dir/$installer_name"
+    
+    # Download ZIP
+    log_verbose "Downloading $installer_name from $download_url"
+    if ! curl -L -o "$zip_path" "$download_url"; then
+        log_error "Failed to download $installer_name"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Extract ZIP
+    log_verbose "Extracting $installer_name"
+    if ! unzip -q "$zip_path" -d "$temp_dir"; then
+        log_error "Failed to extract $installer_name"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Look for .app bundle or .dmg file in extracted contents
+    local app_bundle
+    app_bundle=$(find "$temp_dir" -name "*.app" -type d | head -1)
+    local dmg_file
+    dmg_file=$(find "$temp_dir" -name "*.dmg" -type f | head -1)
+    
+    if [[ -n "$app_bundle" ]]; then
+        # Found .app bundle, copy it directly
+        log_verbose "Found app bundle: $app_bundle"
+        if ! cp -R "$app_bundle" "/Applications/"; then
+            log_error "Failed to copy app bundle to /Applications/"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+    elif [[ -n "$dmg_file" ]]; then
+        # Found .dmg file, mount and install it
+        log_verbose "Found DMG file in ZIP: $dmg_file"
+        local mount_point
+        mount_point=$(mktemp -d)
+        if ! hdiutil attach "$dmg_file" -mountpoint "$mount_point" -quiet; then
+            log_error "Failed to mount DMG from ZIP: $dmg_file"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        
+        # Copy .app bundle from mounted DMG
+        local dmg_app
+        dmg_app=$(find "$mount_point" -name "*.app" -type d | head -1)
+        if [[ -n "$dmg_app" ]]; then
+            if ! cp -R "$dmg_app" "/Applications/"; then
+                log_error "Failed to copy app from mounted DMG"
+                hdiutil detach "$mount_point" -quiet
+                rm -rf "$temp_dir"
+                return 1
+            fi
+        else
+            log_error "No .app bundle found in mounted DMG"
+            hdiutil detach "$mount_point" -quiet
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        
+        # Unmount DMG
+        hdiutil detach "$mount_point" -quiet
+    else
+        log_error "No .app bundle or .dmg file found in ZIP contents"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Clean up
+    rm -rf "$temp_dir"
+    
+    # Verify installation
+    if is_app_installed "$app_name" "$app_path"; then
+        log_success "Successfully installed '$app_name' from ZIP"
+    else
+        log_error "Installation verification failed for '$app_name'"
+        return 1
+    fi
 }
 
 # Download and install app from DMG
@@ -1136,8 +1238,37 @@ parse_apps_config() {
                             ;;
                         "dmg")
                             local installer_name
-                            installer_name=$(basename "$install_data")
+                            # Handle URLs with query parameters by extracting just the path and adding .dmg extension
+                            if [[ "$install_data" =~ ^https?:// ]]; then
+                                # Extract the path part before query parameters and add .dmg extension
+                                local url_path
+                                url_path=$(echo "$install_data" | sed 's/[?&].*$//' | sed 's/.*\///')
+                                if [[ "$url_path" == *".dmg" ]]; then
+                                    installer_name="$url_path"
+                                else
+                                    installer_name="${app_name}.dmg"
+                                fi
+                            else
+                                installer_name=$(basename "$install_data")
+                            fi
                             install_dmg_app "$app_name" "$install_data" "$app_path" "$installer_name"
+                            ;;
+                        "zip")
+                            local installer_name
+                            # Handle URLs with query parameters by extracting just the path and adding .zip extension
+                            if [[ "$install_data" =~ ^https?:// ]]; then
+                                # Extract the path part before query parameters and add .zip extension
+                                local url_path
+                                url_path=$(echo "$install_data" | sed 's/[?&].*$//' | sed 's/.*\///')
+                                if [[ "$url_path" == *".zip" ]]; then
+                                    installer_name="$url_path"
+                                else
+                                    installer_name="${app_name}.zip"
+                                fi
+                            else
+                                installer_name=$(basename "$install_data")
+                            fi
+                            install_zip_app "$app_name" "$install_data" "$app_path" "$installer_name"
                             ;;
                         "dmg_github_release")
                             install_github_release_dmg "$app_name" "$install_data" "$app_path"
