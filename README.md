@@ -5,7 +5,7 @@ A comprehensive setup script for macOS 15.6.1+ that installs applications and co
 ## Features
 
 - **Idempotent**: Safe to run multiple times - won't reinstall already installed apps
-- **Configurable**: Uses markdown files to define what to install
+- **Configurable**: Uses config files to define what to install
 - **Flexible**: Supports multiple installation methods (Homebrew, DMG, custom installers, asdf)
 - **Shell Integration**: Automatically configures zshrc with your customizations
 - **Cleanup**: Optional cleanup of old installer files
