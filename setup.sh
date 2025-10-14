@@ -524,14 +524,21 @@ discover_github_release_dmg_url() {
         log_warning "Invalid GitHub repository URL: $repo_url"
         return 1
     fi
-    
+
     # Get latest release info
     log_verbose "Fetching latest release for $repo_owner_repo"
     local release_info
+    local curl_exit_code
     release_info=$(curl -s --max-time 10 --connect-timeout 5 "https://api.github.com/repos/$repo_owner_repo/releases/latest" 2>/dev/null)
+    curl_exit_code=$?
+    
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch release information for $repo_owner_repo (curl exit code: $curl_exit_code)"
+        return 1
+    fi
     
     if [[ -z "$release_info" ]]; then
-        log_error "Failed to fetch release information for $repo_owner_repo (timeout or connection error)"
+        log_error "Failed to fetch release information for $repo_owner_repo (empty response)"
         return 1
     fi
     
@@ -541,6 +548,7 @@ discover_github_release_dmg_url() {
     log_verbose "System architecture: $system_arch"
     
     # Find appropriate DMG asset
+    log_verbose "Searching for DMG assets in GitHub release..."
     local dmg_url
     dmg_url=$(echo "$release_info" | jq -r --arg arch "$system_arch" '
         .assets[] | 
@@ -575,14 +583,22 @@ discover_web_release_dmg_url() {
     # Fetch the webpage with timeout
     log_verbose "Fetching release page: $web_url"
     local page_content
+    local curl_exit_code
     page_content=$(curl -s --max-time 10 --connect-timeout 5 "$web_url" 2>/dev/null)
+    curl_exit_code=$?
+    
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch release page: $web_url (curl exit code: $curl_exit_code)"
+        return 1
+    fi
     
     if [[ -z "$page_content" ]]; then
-        log_error "Failed to fetch release page: $web_url (timeout or connection error)"
+        log_error "Failed to fetch release page: $web_url (empty response)"
         return 1
     fi
     
     # Extract DMG URLs with preference order
+    log_verbose "Searching for DMG download links..."
     local dmg_url
     dmg_url=$(echo "$page_content" | grep -oE 'href="[^"]*\.dmg[^"]*"' | sed 's/href="//g; s/"//g' | while read -r url; do
         # Convert relative URLs to absolute
@@ -594,15 +610,19 @@ discover_web_release_dmg_url() {
     done | while read -r url; do
         # Check preferences in order
         if echo "$url" | grep -qi "universal"; then
+            log_verbose "Found universal DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "$system_arch"; then
+            log_verbose "Found architecture-specific DMG ($system_arch): $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "silicon"; then
+            log_verbose "Found silicon DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "apple"; then
+            log_verbose "Found apple DMG: $url"
             echo "$url"
             break
         fi
@@ -680,10 +700,17 @@ discover_synergy_release_dmg_url() {
     # Fetch the webpage with timeout
     log_verbose "Fetching Synergy release page: $web_url"
     local page_content
+    local curl_exit_code
     page_content=$(curl -s --max-time 10 --connect-timeout 5 "$web_url" 2>/dev/null)
-    
+    curl_exit_code=$?
+
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch Synergy release page: $web_url (curl exit code: $curl_exit_code)"
+        return 1
+    fi
+
     if [[ -z "$page_content" ]]; then
-        log_error "Failed to fetch Synergy release page: $web_url (timeout or connection error)"
+        log_error "Failed to fetch Synergy release page: $web_url (empty response)"
         return 1
     fi
     
@@ -829,10 +856,17 @@ install_github_release_dmg() {
     # Get latest release info
     log_verbose "Fetching latest release for $repo_owner_repo"
     local release_info
+    local curl_exit_code
     release_info=$(curl -s --max-time 10 --connect-timeout 5 "https://api.github.com/repos/$repo_owner_repo/releases/latest" 2>/dev/null)
+    curl_exit_code=$?
+    
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch release information for $repo_owner_repo (curl exit code: $curl_exit_code)"
+        return 1
+    fi
     
     if [[ -z "$release_info" ]]; then
-        log_error "Failed to fetch release information for $repo_owner_repo (timeout or connection error)"
+        log_error "Failed to fetch release information for $repo_owner_repo (empty response)"
         return 1
     fi
     
@@ -842,6 +876,7 @@ install_github_release_dmg() {
     log_verbose "System architecture: $system_arch"
     
     # Find appropriate DMG asset
+    log_verbose "Searching for DMG assets in GitHub release..."
     local dmg_url
     dmg_url=$(echo "$release_info" | jq -r --arg arch "$system_arch" '
         .assets[] | 
@@ -900,14 +935,22 @@ install_web_release_dmg() {
     # Fetch the webpage
     log_verbose "Fetching release page: $web_url"
     local page_content
+    local curl_exit_code
     page_content=$(curl -s --max-time 10 --connect-timeout 5 "$web_url" 2>/dev/null)
+    curl_exit_code=$?
+    
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch release page: $web_url (curl exit code: $curl_exit_code)"
+        return 1
+    fi
     
     if [[ -z "$page_content" ]]; then
-        log_error "Failed to fetch release page: $web_url (timeout or connection error)"
+        log_error "Failed to fetch release page: $web_url (empty response)"
         return 1
     fi
     
     # Extract DMG URLs with preference order
+    log_verbose "Searching for DMG download links..."
     local dmg_url
     dmg_url=$(echo "$page_content" | grep -oE 'href="[^"]*\.dmg[^"]*"' | sed 's/href="//g; s/"//g' | while read -r url; do
         # Convert relative URLs to absolute
@@ -919,15 +962,19 @@ install_web_release_dmg() {
     done | while read -r url; do
         # Check preferences in order
         if echo "$url" | grep -qi "universal"; then
+            log_verbose "Found universal DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "$system_arch"; then
+            log_verbose "Found architecture-specific DMG ($system_arch): $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "silicon"; then
+            log_verbose "Found silicon DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "apple"; then
+            log_verbose "Found apple DMG: $url"
             echo "$url"
             break
         fi
@@ -1118,10 +1165,17 @@ install_synergy_release_dmg() {
     # Fetch the webpage with timeout
     log_verbose "Fetching Synergy release page: $web_url"
     local page_content
+    local curl_exit_code
     page_content=$(curl -s --max-time 10 --connect-timeout 5 "$web_url" 2>/dev/null)
+    curl_exit_code=$?
+
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch Synergy release page: $web_url (curl exit code: $curl_exit_code)"
+        return 1
+    fi
 
     if [[ -z "$page_content" ]]; then
-        log_error "Failed to fetch Synergy release page: $web_url (timeout or connection error)"
+        log_error "Failed to fetch Synergy release page: $web_url (empty response)"
         return 1
     fi
 
