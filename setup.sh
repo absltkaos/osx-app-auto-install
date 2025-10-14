@@ -864,7 +864,19 @@ install_github_release_dmg() {
     
     # Download and install DMG
     local installer_name
-    installer_name=$(basename "$dmg_url")
+    # Handle URLs with query parameters by extracting just the path and adding .dmg extension
+    if [[ "$dmg_url" =~ ^https?:// ]]; then
+        # Extract the path part before query parameters and add .dmg extension
+        local url_path
+        url_path=$(echo "$dmg_url" | sed 's/[?&].*$//' | sed 's/.*\///')
+        if [[ "$url_path" == *".dmg" ]]; then
+            installer_name="$url_path"
+        else
+            installer_name="${app_name}.dmg"
+        fi
+    else
+        installer_name=$(basename "$dmg_url")
+    fi
     install_dmg_app "$app_name" "$dmg_url" "$app_path" "$installer_name"
 }
 
@@ -981,7 +993,19 @@ install_web_release_dmg() {
     
     # Download and install DMG
     local installer_name
-    installer_name=$(basename "$dmg_url")
+    # Handle URLs with query parameters by extracting just the path and adding .dmg extension
+    if [[ "$dmg_url" =~ ^https?:// ]]; then
+        # Extract the path part before query parameters and add .dmg extension
+        local url_path
+        url_path=$(echo "$dmg_url" | sed 's/[?&].*$//' | sed 's/.*\///')
+        if [[ "$url_path" == *".dmg" ]]; then
+            installer_name="$url_path"
+        else
+            installer_name="${app_name}.dmg"
+        fi
+    else
+        installer_name=$(basename "$dmg_url")
+    fi
     install_dmg_app "$app_name" "$dmg_url" "$app_path" "$installer_name"
 }
 
