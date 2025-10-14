@@ -1,0 +1,61 @@
+export PATH=$HOME/bin:$HOME/.krew/bin:$PATH
+export GOPATH=$HOME/go
+export GOROOT="$(brew --prefix golang)/libexec"
+export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
+export ASDF_HASHICORP_OVERWRITE_ARCH=amd64
+export PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"
+export GITHUB_TOKEN="$HOMEBREW_GITHUB_API_TOKEN"
+
+autoload -Uz compinit
+compinit
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+[[ $commands[kubectl] ]] && source <(kubectl completion zsh)
+alias k=kubectl
+
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ll='ls -l'
+alias grep='grep --color=auto'
+
+alias gmu='git checkout $(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d "/" -f 2) && git pull origin $(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d "/" -f 2)'
+alias gbc='git fetch -p && git branch -vv | awk "/: gone]/{print \$1}" | xargs git branch -D'
+alias gpm='git pull origin $(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d "/" -f 2)'
+
+function gudnb {
+    # git,update,delete,new,branch
+    local org_branch
+    local main_branch
+    local confirm
+    local new_branch
+
+    org_branch=$(git status | sed -n 's/^On branch \(.*\)/\1/p')
+    main_branch=$(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d '/' -f 2)
+    new_branch="$1"
+
+    echo "Checking out and updating default branch: $main_branch"
+    git checkout $main_branch && git pull origin $main_branch
+    if [[ "$org_branch" == "$main_branch" ]] ; then
+        echo "Already on default branch: $main_branch, not deleting any branch!"
+    else
+        read "confirm?Really delete current branch: $org_branch (y/n)? "
+        if [[ "$confirm" == "y" ]] ; then
+            git branch -d $org_branch
+        fi
+    fi
+    if [[ -z "$new_branch" ]] ; then
+        read "confirm?No new branch name provided. Create a new branch (y/n)? "
+        if [[ "$confirm" == "y" ]] ; then
+            read "new_branch?Enter new branch name: "
+        else
+            return 0
+        fi
+    fi
+    echo "Creating new branch: $new_branch"
+    git checkout -b $new_branch
+}
+
+hcf () {
+	cd $(find $GIT_PROJECTS_WORKDIR/*/charts -type d -maxdepth 1 | egrep -v 'charts$'  | fzf --nth=-1 --delimiter='/' --preview='tree -C {}' --with-nth -3,-1 --reverse)
+}
