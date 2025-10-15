@@ -599,7 +599,6 @@ find_dmg_url_from_web_page() {
             break
         elif echo "$url" | grep -qi "apple"; then
             echo "$url"
-            echo "$url"
             break
         fi
     done | head -1)
@@ -710,47 +709,9 @@ discover_web_release_dmg_url() {
     fi
     
     # Extract DMG URLs with preference order
-    log_verbose "Searching for DMG download links..."
+    # Use shared function to find DMG URL
     local dmg_url
-    dmg_url=$(echo "$page_content" | grep -oE 'href="[^"]*\.dmg[^"]*"' | sed 's/href="//g; s/"//g' | while read -r url; do
-        # Convert relative URLs to absolute
-        if [[ "$url" =~ ^https?:// ]]; then
-            echo "$url"
-        else
-            echo "$web_url$url"
-        fi
-    done | while read -r url; do
-        # Check preferences in order
-        if echo "$url" | grep -qi "universal"; then
-            echo "$url"
-            break
-        elif echo "$url" | grep -qi "$system_arch"; then
-            echo "$url"
-            break
-        elif echo "$url" | grep -qi "silicon"; then
-            echo "$url"
-            break
-        elif echo "$url" | grep -qi "apple"; then
-            echo "$url"
-            echo "$url"
-            break
-        fi
-    done | head -1)
-    
-    # Log what we found (outside of command substitution)
-    if [[ -n "$dmg_url" ]]; then
-        if echo "$dmg_url" | grep -qi "universal"; then
-            log_verbose "Found universal DMG: $dmg_url"
-        elif echo "$dmg_url" | grep -qi "$system_arch"; then
-            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url"
-        elif echo "$dmg_url" | grep -qi "silicon"; then
-            log_verbose "Found silicon DMG: $dmg_url"
-        elif echo "$dmg_url" | grep -qi "apple"; then
-            log_verbose "Found apple DMG: $dmg_url"
-        else
-            log_verbose "Found DMG: $dmg_url"
-        fi
-    fi
+    dmg_url=$(find_dmg_url_from_web_page "$web_url" "$page_content" "$system_arch")
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
@@ -1074,47 +1035,9 @@ install_web_release_dmg() {
     fi
     
     # Extract DMG URLs with preference order
-    log_verbose "Searching for DMG download links..."
+    # Use shared function to find DMG URL
     local dmg_url
-    dmg_url=$(echo "$page_content" | grep -oE 'href="[^"]*\.dmg[^"]*"' | sed 's/href="//g; s/"//g' | while read -r url; do
-        # Convert relative URLs to absolute
-        if [[ "$url" =~ ^https?:// ]]; then
-            echo "$url"
-        else
-            echo "$web_url$url"
-        fi
-    done | while read -r url; do
-        # Check preferences in order
-        if echo "$url" | grep -qi "universal"; then
-            echo "$url"
-            break
-        elif echo "$url" | grep -qi "$system_arch"; then
-            echo "$url"
-            break
-        elif echo "$url" | grep -qi "silicon"; then
-            echo "$url"
-            break
-        elif echo "$url" | grep -qi "apple"; then
-            echo "$url"
-            echo "$url"
-            break
-        fi
-    done | head -1)
-    
-    # Log what we found (outside of command substitution)
-    if [[ -n "$dmg_url" ]]; then
-        if echo "$dmg_url" | grep -qi "universal"; then
-            log_verbose "Found universal DMG: $dmg_url"
-        elif echo "$dmg_url" | grep -qi "$system_arch"; then
-            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url"
-        elif echo "$dmg_url" | grep -qi "silicon"; then
-            log_verbose "Found silicon DMG: $dmg_url"
-        elif echo "$dmg_url" | grep -qi "apple"; then
-            log_verbose "Found apple DMG: $dmg_url"
-        else
-            log_verbose "Found DMG: $dmg_url"
-        fi
-    fi
+    dmg_url=$(find_dmg_url_from_web_page "$web_url" "$page_content" "$system_arch")
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
