@@ -577,7 +577,7 @@ find_dmg_url_from_web_page() {
     local system_arch="$3"
     
     # Extract DMG URLs with preference order
-    log_verbose "Searching for DMG download links..."
+    log_verbose "Searching for DMG download links..." >&2
     local dmg_url
     dmg_url=$(echo "$page_content" | grep -oE 'href="[^"]*\.dmg[^"]*"' | sed 's/href="//g; s/"//g' | while read -r url; do
         # Convert relative URLs to absolute
@@ -603,24 +603,24 @@ find_dmg_url_from_web_page() {
         fi
     done | head -1)
     
-    # Log what we found (outside of command substitution)
+    # Log what we found (redirect to stderr to avoid interfering with stdout)
     if [[ -n "$dmg_url" ]]; then
         if echo "$dmg_url" | grep -qi "universal"; then
-            log_verbose "Found universal DMG: $dmg_url"
+            log_verbose "Found universal DMG: $dmg_url" >&2
         elif echo "$dmg_url" | grep -qi "$system_arch"; then
-            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url"
+            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url" >&2
         elif echo "$dmg_url" | grep -qi "silicon"; then
-            log_verbose "Found silicon DMG: $dmg_url"
+            log_verbose "Found silicon DMG: $dmg_url" >&2
         elif echo "$dmg_url" | grep -qi "apple"; then
-            log_verbose "Found apple DMG: $dmg_url"
+            log_verbose "Found apple DMG: $dmg_url" >&2
         else
-            log_verbose "Found DMG: $dmg_url"
+            log_verbose "Found DMG: $dmg_url" >&2
         fi
     fi
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
-        log_verbose "No direct DMG URLs found, checking for redirect URLs..."
+        log_verbose "No direct DMG URLs found, checking for redirect URLs..." >&2
         
         # Look for hrefs that might be redirect URLs (containing download, api, etc.)
         local redirect_urls
@@ -635,7 +635,7 @@ find_dmg_url_from_web_page() {
         
         # Try each redirect URL to see if it leads to a DMG
         for redirect_url in $redirect_urls; do
-            log_verbose "Checking redirect URL: $redirect_url"
+            log_verbose "Checking redirect URL: $redirect_url" >&2
             
             # Follow redirects and check if the final URL is a DMG
             local final_url
@@ -644,19 +644,19 @@ find_dmg_url_from_web_page() {
             if [[ -n "$final_url" ]] && echo "$final_url" | grep -qi "\.dmg"; then
                 # Check if this DMG matches our architecture preferences
                 if echo "$final_url" | grep -qi "universal"; then
-                    log_verbose "Found universal DMG via redirect: $final_url"
+                    log_verbose "Found universal DMG via redirect: $final_url" >&2
                     dmg_url="$final_url"
                     break
                 elif echo "$final_url" | grep -qi "$system_arch"; then
-                    log_verbose "Found architecture-specific DMG via redirect ($system_arch): $final_url"
+                    log_verbose "Found architecture-specific DMG via redirect ($system_arch): $final_url" >&2
                     dmg_url="$final_url"
                     break
                 elif echo "$final_url" | grep -qi "silicon"; then
-                    log_verbose "Found silicon DMG via redirect: $final_url"
+                    log_verbose "Found silicon DMG via redirect: $final_url" >&2
                     dmg_url="$final_url"
                     break
                 elif echo "$final_url" | grep -qi "apple"; then
-                    log_verbose "Found apple DMG via redirect: $final_url"
+                    log_verbose "Found apple DMG via redirect: $final_url" >&2
                     dmg_url="$final_url"
                     break
                 fi
@@ -670,7 +670,7 @@ find_dmg_url_from_web_page() {
                 final_url=$(curl -s --max-time 5 --connect-timeout 3 -I "$redirect_url" 2>/dev/null | grep -i "^location:" | sed 's/location: *//i' | tr -d '\r\n')
                 
                 if [[ -n "$final_url" ]] && echo "$final_url" | grep -qi "\.dmg"; then
-                    log_verbose "Found DMG via redirect (fallback): $final_url"
+                    log_verbose "Found DMG via redirect (fallback): $final_url" >&2
                     dmg_url="$final_url"
                     break
                 fi
@@ -715,7 +715,7 @@ discover_web_release_dmg_url() {
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
-        log_verbose "No direct DMG URLs found, checking for redirect URLs..."
+        log_verbose "No direct DMG URLs found, checking for redirect URLs..." >&2
         
         # Look for hrefs that might be redirect URLs (containing download, api, etc.)
         local redirect_urls
@@ -730,7 +730,7 @@ discover_web_release_dmg_url() {
         
         # Try each redirect URL to see if it leads to a DMG
         for redirect_url in $redirect_urls; do
-            log_verbose "Checking redirect URL: $redirect_url"
+            log_verbose "Checking redirect URL: $redirect_url" >&2
             
             # Follow redirects and check if the final URL is a DMG
             local final_url
@@ -1041,7 +1041,7 @@ install_web_release_dmg() {
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
-        log_verbose "No direct DMG URLs found, checking for redirect URLs..."
+        log_verbose "No direct DMG URLs found, checking for redirect URLs..." >&2
         
         # Look for hrefs that might be redirect URLs (containing download, api, etc.)
         local redirect_urls
@@ -1056,7 +1056,7 @@ install_web_release_dmg() {
         
         # Try each redirect URL to see if it leads to a DMG
         for redirect_url in $redirect_urls; do
-            log_verbose "Checking redirect URL: $redirect_url"
+            log_verbose "Checking redirect URL: $redirect_url" >&2
             
             # Follow redirects and check if the final URL is a DMG
             local final_url
