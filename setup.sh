@@ -589,23 +589,35 @@ find_dmg_url_from_web_page() {
     done | while read -r url; do
         # Check preferences in order
         if echo "$url" | grep -qi "universal"; then
-            log_verbose "Found universal DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "$system_arch"; then
-            log_verbose "Found architecture-specific DMG ($system_arch): $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "silicon"; then
-            log_verbose "Found silicon DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "apple"; then
-            log_verbose "Found apple DMG: $url"
+            echo "$url"
             echo "$url"
             break
         fi
     done | head -1)
+    
+    # Log what we found (outside of command substitution)
+    if [[ -n "$dmg_url" ]]; then
+        if echo "$dmg_url" | grep -qi "universal"; then
+            log_verbose "Found universal DMG: $dmg_url"
+        elif echo "$dmg_url" | grep -qi "$system_arch"; then
+            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url"
+        elif echo "$dmg_url" | grep -qi "silicon"; then
+            log_verbose "Found silicon DMG: $dmg_url"
+        elif echo "$dmg_url" | grep -qi "apple"; then
+            log_verbose "Found apple DMG: $dmg_url"
+        else
+            log_verbose "Found DMG: $dmg_url"
+        fi
+    fi
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
@@ -710,23 +722,35 @@ discover_web_release_dmg_url() {
     done | while read -r url; do
         # Check preferences in order
         if echo "$url" | grep -qi "universal"; then
-            log_verbose "Found universal DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "$system_arch"; then
-            log_verbose "Found architecture-specific DMG ($system_arch): $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "silicon"; then
-            log_verbose "Found silicon DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "apple"; then
-            log_verbose "Found apple DMG: $url"
+            echo "$url"
             echo "$url"
             break
         fi
     done | head -1)
+    
+    # Log what we found (outside of command substitution)
+    if [[ -n "$dmg_url" ]]; then
+        if echo "$dmg_url" | grep -qi "universal"; then
+            log_verbose "Found universal DMG: $dmg_url"
+        elif echo "$dmg_url" | grep -qi "$system_arch"; then
+            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url"
+        elif echo "$dmg_url" | grep -qi "silicon"; then
+            log_verbose "Found silicon DMG: $dmg_url"
+        elif echo "$dmg_url" | grep -qi "apple"; then
+            log_verbose "Found apple DMG: $dmg_url"
+        else
+            log_verbose "Found DMG: $dmg_url"
+        fi
+    fi
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
@@ -1062,23 +1086,35 @@ install_web_release_dmg() {
     done | while read -r url; do
         # Check preferences in order
         if echo "$url" | grep -qi "universal"; then
-            log_verbose "Found universal DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "$system_arch"; then
-            log_verbose "Found architecture-specific DMG ($system_arch): $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "silicon"; then
-            log_verbose "Found silicon DMG: $url"
             echo "$url"
             break
         elif echo "$url" | grep -qi "apple"; then
-            log_verbose "Found apple DMG: $url"
+            echo "$url"
             echo "$url"
             break
         fi
     done | head -1)
+    
+    # Log what we found (outside of command substitution)
+    if [[ -n "$dmg_url" ]]; then
+        if echo "$dmg_url" | grep -qi "universal"; then
+            log_verbose "Found universal DMG: $dmg_url"
+        elif echo "$dmg_url" | grep -qi "$system_arch"; then
+            log_verbose "Found architecture-specific DMG ($system_arch): $dmg_url"
+        elif echo "$dmg_url" | grep -qi "silicon"; then
+            log_verbose "Found silicon DMG: $dmg_url"
+        elif echo "$dmg_url" | grep -qi "apple"; then
+            log_verbose "Found apple DMG: $dmg_url"
+        else
+            log_verbose "Found DMG: $dmg_url"
+        fi
+    fi
     
     # If no direct DMG URLs found, look for redirect URLs (like Cursor's API endpoints)
     if [[ -z "$dmg_url" ]]; then
