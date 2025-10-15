@@ -218,8 +218,15 @@ check_apps_config() {
                     fi
                     ;;
                 "asdf")
-                    if ! asdf list "$app_name" | grep -q "$install_data"; then
-                        log_info "Will install '$app_name' version $install_data via asdf"
+                    # Check if asdf is available first
+                    if command -v asdf >/dev/null 2>&1; then
+                        if ! asdf list "$app_name" | grep -q "$install_data"; then
+                            log_info "Will install '$app_name' version $install_data via asdf"
+                            SUDO_REQUIRED=true
+                        fi
+                    else
+                        # asdf not installed yet, assume tool needs to be installed
+                        log_info "Will install '$app_name' version $install_data via asdf (asdf will be installed first)"
                         SUDO_REQUIRED=true
                     fi
                     ;;
