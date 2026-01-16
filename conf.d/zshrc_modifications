@@ -18,11 +18,27 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ll='ls -l'
 alias grep='grep --color=auto'
+alias sshadd='ssh-add $(find ~/.ssh/ -type f -name "id_*" ! -name "*.pub")'
 
+# Run pre-commit on files changed since main/master/default branch
+alias pcdm='pre-commit run --files $(git diff --name-only origin/$(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d '/' -f 2))'
+
+# Get back to default branch and pull in latest changes from origin
 alias gmu='git checkout $(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d "/" -f 2) && git pull origin $(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d "/" -f 2)'
+
+# Git branches clean. Look for old branchs and remove them
 alias gbc='git fetch -p && git branch -vv | awk "/: gone]/{print \$1}" | xargs git branch -D'
+
+# Git pull main/master/default branch
 alias gpm='git pull origin $(git symbolic-ref refs/remotes/origin/HEAD --short | cut -d "/" -f 2)'
 
+# Git push origin. Push the current local branch to origin branch
+alias gpo="git push origin \$(git status | sed -n 's/^On branch \(.*\)/\1/p')"
+
+# Git push origin force. Push the current local branch to origin branch
+alias gpof="git push origin \$(git status | sed -n 's/^On branch \(.*\)/\1/p')" -f
+
+# Go back to main branch and get latest changes, delete branch you came from, and create a new branch
 function gudnb {
     # git,update,delete,new,branch
     local org_branch
@@ -41,7 +57,7 @@ function gudnb {
     else
         read "confirm?Really delete current branch: $org_branch (y/n)? "
         if [[ "$confirm" == "y" ]] ; then
-            git branch -d $org_branch
+            git branch -D $org_branch
         fi
     fi
     if [[ -z "$new_branch" ]] ; then
