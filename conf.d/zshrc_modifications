@@ -9,12 +9,18 @@ export GITHUB_TOKEN="$HOMEBREW_GITHUB_API_TOKEN"
 autoload -Uz compinit
 compinit
 
+# Brew autocompletion
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
+# Kubectl autocompletion
 [[ $commands[kubectl] ]] && source <(kubectl completion zsh)
 alias k=kubectl
 
+# Task autocompletion
 eval "$(task --completion zsh)"
+
+# Podman autocompletion
+source <(podman completion zsh)
 
 alias ..='cd ..'
 alias ...='cd ../..'
