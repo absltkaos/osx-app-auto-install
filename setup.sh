@@ -206,6 +206,15 @@ check_apps_config() {
                                 SUDO_REQUIRED=true
                             fi
                             ;;
+                        "dmg_codeberg_release")
+                            if ! is_app_installed "$app_name" "$app_path"; then
+                                log_info "Will install '$app_name' from Codeberg release"
+                                if ! discover_codeberg_release_dmg_url "$app_name" "$install_data"; then
+                                    log_error "Failed to discover Codeberg release DMG URL for '$app_name'"
+                                fi
+                                SUDO_REQUIRED=true
+                            fi
+                            ;;
                         "manual")
                             log_info "Manual installation required for $app_name: $install_data"
                             ;;
@@ -574,6 +583,82 @@ discover_github_release_dmg_url() {
         return 1
     fi
     
+    log_info "  Would download DMG from: $dmg_url"
+}
+
+# Discover Codeberg release DMG URL (for dry-run)
+discover_codeberg_release_dmg_url() {
+    local app_name="$1"
+    local repo_url="$2"
+
+    # Extract owner/repo from URL
+    local repo_owner_repo
+    if [[ "$repo_url" =~ codeberg\.org/([^/]+)/([^/]+) ]]; then
+        repo_owner_repo="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+    else
+        log_warning "Invalid Codeberg repository URL: $repo_url"
+        return 1
+    fi
+
+    # Get recent releases
+    log_verbose "Fetching recent releases for $repo_owner_repo from Codeberg"
+    local releases_json
+    local curl_exit_code
+    releases_json=$(curl -s --max-time 10 --connect-timeout 5 "https://codeberg.org/api/v1/repos/$repo_owner_repo/releases?limit=10" 2>/dev/null)
+    curl_exit_code=$?
+
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch release information for $repo_owner_repo from Codeberg (curl exit code: $curl_exit_code)"
+        return 1
+    fi
+
+    if [[ -z "$releases_json" ]]; then
+        log_error "Failed to fetch release information for $repo_owner_repo from Codeberg (empty response)"
+        return 1
+    fi
+
+    # Get system architecture
+    local system_arch
+    system_arch=$(get_system_architecture)
+    log_verbose "System architecture: $system_arch"
+
+    # Find latest stable (non-prerelease) release and appropriate DMG asset
+    log_verbose "Searching for DMG assets in Codeberg releases..."
+    local dmg_url
+    dmg_url=$(printf '%s\n' "$releases_json" | jq -r --arg arch "$system_arch" '
+        (map(select(.prerelease | not)) | .[0] // empty) as $rel
+        | if $rel == null then empty else
+            (
+              $rel.assets[]
+              | select(.name | endswith(".dmg"))
+              | if $arch == "arm64" then
+                    select(.name | test("macos-arm64"; "i"))
+                elif $arch == "x86_64" then
+                    select(.name | test("macos-x86_64"; "i"))
+                else
+                    .
+                end
+            )
+            | .browser_download_url
+          end' | head -1)
+
+    # Fallback to any DMG in the latest stable release
+    if [[ -z "$dmg_url" || "$dmg_url" == "null" ]]; then
+        dmg_url=$(printf '%s\n' "$releases_json" | jq -r '
+            (map(select(.prerelease | not)) | .[0] // empty) as $rel
+            | if $rel == null then empty else
+                $rel.assets[]
+                | select(.name | endswith(".dmg"))
+                | .browser_download_url
+              end' | head -1)
+    fi
+
+    if [[ -z "$dmg_url" || "$dmg_url" == "null" ]]; then
+        log_error "No DMG asset found in recent stable releases for $repo_owner_repo on Codeberg"
+        log_error "  Please check the repository URL or use a different installer type"
+        return 1
+    fi
+
     log_info "  Would download DMG from: $dmg_url"
 }
 
@@ -1007,6 +1092,106 @@ install_github_release_dmg() {
     install_dmg_app "$app_name" "$dmg_url" "$app_path" "$installer_name"
 }
 
+# Install app from Codeberg release
+install_codeberg_release_dmg() {
+    local app_name="$1"
+    local repo_url="$2"
+    local app_path="$3"
+
+    if is_app_installed "$app_name" "$app_path"; then
+        return 0
+    fi
+
+    log_info "Installing '$app_name' from Codeberg release..."
+
+    # Extract owner/repo from URL
+    local repo_owner_repo
+    if [[ "$repo_url" =~ codeberg\.org/([^/]+)/([^/]+) ]]; then
+        repo_owner_repo="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+    else
+        log_error "Invalid Codeberg repository URL: $repo_url"
+        return 1
+    fi
+
+    # Get recent releases
+    log_verbose "Fetching recent releases for $repo_owner_repo from Codeberg"
+    local releases_json
+    local curl_exit_code
+    releases_json=$(curl -s --max-time 10 --connect-timeout 5 "https://codeberg.org/api/v1/repos/$repo_owner_repo/releases?limit=10" 2>/dev/null)
+    curl_exit_code=$?
+
+    if [[ $curl_exit_code -ne 0 ]]; then
+        log_error "Failed to fetch release information for $repo_owner_repo from Codeberg (curl exit code: $curl_exit_code)"
+        return 1
+    fi
+
+    if [[ -z "$releases_json" ]]; then
+        log_error "Failed to fetch release information for $repo_owner_repo from Codeberg (empty response)"
+        return 1
+    fi
+
+    # Get system architecture
+    local system_arch
+    system_arch=$(get_system_architecture)
+    log_verbose "System architecture: $system_arch"
+
+    # Find latest stable (non-prerelease) release and appropriate DMG asset
+    log_verbose "Searching for DMG assets in Codeberg releases..."
+    local dmg_url
+    dmg_url=$(printf '%s\n' "$releases_json" | jq -r --arg arch "$system_arch" '
+        (map(select(.prerelease | not)) | .[0] // empty) as $rel
+        | if $rel == null then empty else
+            (
+              $rel.assets[]
+              | select(.name | endswith(".dmg"))
+              | if $arch == "arm64" then
+                    select(.name | test("macos-arm64"; "i"))
+                elif $arch == "x86_64" then
+                    select(.name | test("macos-x86_64"; "i"))
+                else
+                    .
+                end
+            )
+            | .browser_download_url
+          end' | head -1)
+
+    # Fallback to any DMG in the latest stable release
+    if [[ -z "$dmg_url" || "$dmg_url" == "null" ]]; then
+        dmg_url=$(printf '%s\n' "$releases_json" | jq -r '
+            (map(select(.prerelease | not)) | .[0] // empty) as $rel
+            | if $rel == null then empty else
+                $rel.assets[]
+                | select(.name | endswith(".dmg"))
+                | .browser_download_url
+              end' | head -1)
+    fi
+
+    if [[ -z "$dmg_url" || "$dmg_url" == "null" ]]; then
+        log_error "No DMG asset found in recent stable releases for $repo_owner_repo on Codeberg"
+        log_error "  Please check the repository URL or use a different installer type"
+        return 1
+    fi
+
+    log_verbose "Found DMG URL: $dmg_url"
+
+    # Download and install DMG
+    local installer_name
+    # Handle URLs with query parameters by extracting just the path and adding .dmg extension
+    if [[ "$dmg_url" =~ ^https?:// ]]; then
+        # Extract the path part before query parameters and add .dmg extension
+        local url_path
+        url_path=$(echo "$dmg_url" | sed 's/[?&].*$//' | sed 's/.*\///')
+        if [[ "$url_path" == *".dmg" ]]; then
+            installer_name="$url_path"
+        else
+            installer_name="${app_name}.dmg"
+        fi
+    else
+        installer_name=$(basename "$dmg_url")
+    fi
+    install_dmg_app "$app_name" "$dmg_url" "$app_path" "$installer_name"
+}
+
 # Install app from web release page
 install_web_release_dmg() {
     local app_name="$1"
@@ -1422,6 +1607,9 @@ parse_apps_config() {
                             ;;
                         "dmg_synergy_release")
                             install_synergy_release_dmg "$app_name" "$install_data" "$app_path"
+                            ;;
+                        "dmg_codeberg_release")
+                            install_codeberg_release_dmg "$app_name" "$install_data" "$app_path"
                             ;;
                         "manual")
                             log_warning "Manual installation required for $app_name: $install_data"

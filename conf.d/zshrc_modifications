@@ -83,3 +83,158 @@ function gudnb {
 hcf () {
 	cd $(find $GIT_PROJECTS_WORKDIR/*/charts -type d -maxdepth 1 | egrep -v 'charts$'  | fzf --nth=-1 --delimiter='/' --preview='tree -C {}' --with-nth -3,-1 --reverse)
 }
+
+upgrade-librewolf() {
+    local current_version=""
+    local latest_version=""
+
+    # Check for required tools
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "curl is required but not installed."
+        return 1
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "jq is required but not installed."
+        return 1
+    fi
+
+    # Get current LibreWolf version if installed (from Info.plist)
+    local info_plist="/Applications/LibreWolf.app/Contents/Info.plist"
+    if [[ -f "$info_plist" ]]; then
+        current_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist" 2>/dev/null || true)
+        if [[ -n "$current_version" ]]; then
+            echo "Current LibreWolf version: ${current_version}"
+        else
+            echo "LibreWolf is installed but the version could not be determined from Info.plist."
+        fi
+    else
+        echo "LibreWolf is not currently installed. A fresh install will be performed."
+    fi
+
+    # Determine system architecture
+    local system_arch
+    system_arch=$(uname -m)
+
+    # Fetch latest stable release from Codeberg
+    local releases_json
+    releases_json=$(curl -s --max-time 10 --connect-timeout 5 "https://codeberg.org/api/v1/repos/librewolf/bsys6/releases?limit=10")
+    if [[ -z "$releases_json" ]]; then
+        echo "Failed to fetch LibreWolf releases from Codeberg."
+        return 1
+    fi
+
+    # Get latest non-prerelease release and its tag_name
+    latest_version=$(printf '%s\n' "$releases_json" | jq -r '
+        (map(select(.prerelease | not)) | .[0] // empty) as $rel
+        | if $rel == null then empty else $rel.tag_name end')
+
+    if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
+        echo "Could not determine latest LibreWolf version from Codeberg."
+        return 1
+    fi
+
+    echo "Latest LibreWolf version: ${latest_version}"
+
+    # If current version matches latest, exit
+    if [[ -n "$current_version" && "$current_version" == "$latest_version" ]]; then
+        echo "LibreWolf is already up to date (${current_version})."
+        return 0
+    fi
+
+    # Find appropriate DMG asset for our architecture
+    local dmg_url
+    dmg_url=$(printf '%s\n' "$releases_json" | jq -r --arg arch "$system_arch" '
+        (map(select(.prerelease | not)) | .[0] // empty) as $rel
+        | if $rel == null then empty else
+            (
+              $rel.assets[]
+              | select(.name | endswith(".dmg"))
+              | if $arch == "arm64" then
+                    select(.name | test("macos-arm64"; "i"))
+                elif $arch == "x86_64" then
+                    select(.name | test("macos-x86_64"; "i"))
+                else
+                    .
+                end
+            )
+            | .browser_download_url
+          end' | head -1)
+
+    # Fallback to any DMG in the latest stable release
+    if [[ -z "$dmg_url" || "$dmg_url" == "null" ]]; then
+        dmg_url=$(printf '%s\n' "$releases_json" | jq -r '
+            (map(select(.prerelease | not)) | .[0] // empty) as $rel
+            | if $rel == null then empty else
+                $rel.assets[]
+                | select(.name | endswith(".dmg"))
+                | .browser_download_url
+              end' | head -1)
+    fi
+
+    if [[ -z "$dmg_url" || "$dmg_url" == "null" ]]; then
+        echo "No suitable LibreWolf DMG asset found for the latest stable release."
+        return 1
+    fi
+
+    echo "Downloading LibreWolf DMG from: ${dmg_url}"
+
+    # Prepare temporary paths
+    local temp_dir dmg_path mount_point
+    temp_dir=$(mktemp -d)
+    local dmg_name
+    if [[ "$dmg_url" =~ ^https?:// ]]; then
+        dmg_name=$(echo "$dmg_url" | sed 's/[?&].*$//' | sed 's/.*\///')
+        [[ "$dmg_name" != *.dmg ]] && dmg_name="LibreWolf-${latest_version}.dmg"
+    else
+        dmg_name=$(basename "$dmg_url")
+    fi
+    dmg_path="${temp_dir}/${dmg_name}"
+
+    # Download DMG
+    if ! curl -L -o "$dmg_path" "$dmg_url"; then
+        echo "Failed to download LibreWolf DMG."
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    # Mount DMG
+    mount_point=$(mktemp -d)
+    if ! hdiutil attach "$dmg_path" -mountpoint "$mount_point" -quiet; then
+        echo "Failed to mount LibreWolf DMG."
+        rm -rf "$temp_dir" "$mount_point"
+        return 1
+    fi
+
+    # Find LibreWolf.app inside the mounted image
+    local app_to_install
+    app_to_install=$(find "$mount_point" -name "LibreWolf.app" -type d | head -1)
+    if [[ -z "$app_to_install" ]]; then
+        echo "LibreWolf.app not found in mounted DMG."
+        hdiutil detach "$mount_point" -quiet
+        rm -rf "$temp_dir" "$mount_point"
+        return 1
+    fi
+
+    echo "Installing LibreWolf to /Applications (you may be prompted for your password)..."
+
+    # Copy app into /Applications (replace existing)
+    if ! cp -R "$app_to_install" /Applications/; then
+        echo "Failed to copy LibreWolf.app into /Applications."
+        hdiutil detach "$mount_point" -quiet
+        rm -rf "$temp_dir" "$mount_point"
+        return 1
+    fi
+
+    # Unmount and clean up
+    hdiutil detach "$mount_point" -quiet
+    rm -rf "$temp_dir" "$mount_point"
+
+    echo "LibreWolf upgrade complete."
+    if [[ -f "/Applications/LibreWolf.app/Contents/Info.plist" ]]; then
+        local new_version
+        new_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "/Applications/LibreWolf.app/Contents/Info.plist" 2>/dev/null || true)
+        if [[ -n "$new_version" ]]; then
+            echo "New LibreWolf version: ${new_version}"
+        fi
+    fi
+}

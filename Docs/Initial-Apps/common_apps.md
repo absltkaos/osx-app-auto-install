@@ -15,9 +15,9 @@
   - podman
     - github releases: [Download Page](https://github.com/containers/podman/releases)
     - Main website: [Download Page](https://podman.io/)
-- Via brew:
+- Via brew / DMG:
   - Librewolf
-    * Install command must use `--no-quarantine` argument: `brew install librewolf --no-quarantine`
+    * Installed from LibreWolf Codeberg releases using the latest stable macOS DMG.
   - fzf
   - asdf
   - tmux
